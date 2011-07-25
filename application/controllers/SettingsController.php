@@ -34,27 +34,51 @@ class SettingsController extends Zend_Controller_Action
     	$form = new GDApp_Form_ProjectSettings();
     	$this->view->form = $form;
 
-    	if($this->getRequest()->isPost())
+    	$projects = new GD_Model_ProjectsMapper();
+    	$project_slug = $this->_getParam("project");
+    	if($project_slug != "")
     	{
-    		// save it
+    		$project = $projects->getProjectBySlug($project_slug);
     	}
     	else
     	{
-    		$project_slug = $this->_getParam("project");
+    		$project = new GD_Model_Project();
+    		$project->setName("New Project");
+    	}
+    	$this->view->project = $project;
 
-    		if($project_slug != "")
+    	if($this->getRequest()->isPost())
+    	{
+    		$project->setName($this->_request->getParam('name', false));
+    		$project->setRepositoryUrl($this->_request->getParam('repositoryUrl', false));
+    		$project->setDeploymentBranch($this->_request->getParam('deploymentBranch', false));
+
+    		$projects->save($project);
+
+    		// Save public key
+    		$public_key = $project->getPublicKey();
+    		$public_key->setData($this->_request->getParam('publicKey', false));
+    		$public_keys = new GD_Model_PublicKeysMapper();
+    		$public_keys->save($public_key);
+
+    		$this->_redirect("/home");
+    	}
+    	else
+    	{
+    		$data = array(
+				'name' => $project->getName(),
+				'repositoryUrl' => $project->getRepositoryUrl(),
+				'deploymentBranch' => $project->getDeploymentBranch(),
+				'publicKey' => $project->getPublicKey()->getData(),
+			);
+
+    		$form->populate($data);
+
+    		// Populate list of servers for this project
+    		if($project->getId() > 0)
     		{
-    			$projects = new GD_Model_ProjectsMapper();
-    			$project = $projects->getProjectBySlug($project_slug);
-
-    			$data = array(
-    				'name' => $project->getName(),
-    				'repositoryUrl' => $project->getRepositoryUrl(),
-    				'deploymentBranch' => $project->getDeploymentBranch(),
-    				'publicKey' => $project->getPublicKey()->getData(),
-    			);
-
-    			$form->populate($data);
+	    		$servers = new GD_Model_ServersMapper();
+	    		$this->view->servers = $servers->getServersByProject($project->getId());
     		}
     	}
     }
